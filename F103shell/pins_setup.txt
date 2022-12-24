@@ -1,0 +1,21 @@
+
+
+ ftdi                         STM32 Board
+-------                     -----------
+
+  orange = Rx          -->    Tx A9
+  yellow = Tx          -->    Rx A10
+  green  = Ground      --->   opposite Green Jumper, Pin 2
+
+
+
+STlink 
+-----------
+
+Green  = SWDIO       -->  SWDIO JTAG Pin 7    (closest to CPU, 3 pins no-connect, 4th pin is SWDIO Pin 7)
+
+Yellow = GND         -->  Anywhere down the JTAG GND pins 
+
+Orange = SWCLK       -->  SWCLK JTAG Pin 9    (3 pins NC, 4th pin SWDIO, 5th pin is SWCLK)
+
+Red    = 3.3v        ---->  opposite Green Jumper, Pin1
