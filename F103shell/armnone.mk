@@ -8,12 +8,15 @@ MFLAGS  = -mthumb -mcpu=cortex-m3 -mlittle-endian
 FFLAGS  = -fno-common -ffunction-sections -fdata-sections -fstrict-volatile-bitfields
 ASFLAGS = -Wa,--warn -x assembler-with-cpp
 
-WLFLAGS = -Wl,--cref,-u,Reset_Handler -Wl,--gc-sections -Wl,--defsym=malloc_getpagesize_P=0x80 -Wl,--start-group -Wl,--end-group -Wl,--no-warn-rwx-segments -Wl,--nostdlib
+WLFLAGS = -Wl,--cref,-u,Reset_Handler -Wl,--gc-sections -Wl,--defsym=malloc_getpagesize_P=0x80 -Wl,--start-group -Wl,--end-group -Wl,--nostdlib
 LFLAGS  = $(MFLAGS) -T./stm32_flash.ld -static $(WLFLAGS)
 
 
 GCC = arm-none-eabi-gcc
 
+TARGET  = F103shell
+DEBUG   = Debug
+RELEASE = Release
 
 S_SOURCES = startup_stm32f10x_md.s
 
@@ -49,65 +52,65 @@ C_SOURCES = system_stm32f10x.c     \
             stm32f10x_usart.c      \
             stm32f10x_wwdg.c
 
-OBJS_REL = $(C_SOURCES:%.c=RELEASE/%.o) $(S_SOURCES:%.s=RELEASE/%.o)
-OBJS_DEB = $(C_SOURCES:%.c=DEBUG/%.o)   $(S_SOURCES:%.s=DEBUG/%.o)
+OBJS_REL = $(C_SOURCES:%.c=$(RELEASE)/%.o) $(S_SOURCES:%.s=$(RELEASE)/%.o)
+OBJS_DEB = $(C_SOURCES:%.c=$(DEBUG)/%.o)   $(S_SOURCES:%.s=$(DEBUG)/%.o)
 
 #
-#	$(GCC) -g -gdwarf-2 $(LFLAGS) -specs=nano.specs -specs=nosys.specs -Wl,-Map=DEBUG/F103shell.map $^ -o $@ -lc
+#	$(GCC) -g -gdwarf-2 $(LFLAGS) -specs=nano.specs -specs=nosys.specs -Wl,-Map=$(DEBUG)/$(TARGET).map $^ -o $@ -lc
 #
 #
-DEBUG/F103shell.elf: $(OBJS_DEB)
-	$(GCC) $(LFLAGS) -specs=nano.specs -specs=nosys.specs -Wl,-Map=DEBUG/F103shell.map $^ -o $@ -lc
+$(DEBUG)/$(TARGET).elf: $(OBJS_DEB)
+	$(GCC) $(LFLAGS) -specs=nosys.specs -Wl,-Map=$(DEBUG)/$(TARGET).map $^ -o $@ -lnosys
 	@echo
-	arm-none-eabi-objcopy -O binary DEBUG/F103shell.elf DEBUG/F103shell.bin
+	arm-none-eabi-objcopy -O binary $(DEBUG)/$(TARGET).elf $(DEBUG)/$(TARGET).bin
 
-RELEASE/F103shell.elf: $(OBJS_REL)
-	$(GCC) $(LFLAGS) -specs=nano.specs -specs=nosys.specs -Wl,-Map=DEBUG/F103shell.map $^ -o $@ -lc
+$(RELEASE)/$(TARGET).elf: $(OBJS_REL)
+	$(GCC) $(LFLAGS) -specs=nosys.specs -Wl,-Map=$(DEBUG)/$(TARGET).map $^ -o $@ -lnosys
 	@echo
-	arm-none-eabi-objcopy -O binary RELEASE/F103shell.elf RELEASE/F103shell.bin
+	arm-none-eabi-objcopy -O binary $(RELEASE)/$(TARGET).elf $(RELEASE)/$(TARGET).bin
 
 
 .PHONY:  debug 
 .PHONY:  release
 
-debug: DEBUG/F103shell.elf
+debug: $(DEBUG)/$(TARGET).elf
 
-release: RELEASE/F103shell.elf
+release: $(RELEASE)/$(TARGET).elf
 
 clean:
-	rm -f DEBUG/*.o DEBUG/*.su DEBUG/*.elf DEBUG/*.map DEBUG/*.list DEBUG/*.bin
-	rm -f RELEASE/*.o RELEASE/*.su RELEASE/*.elf RELEASE/*.map RELEASE/*.list RELEASE/*.bin
+	rm -f $(DEBUG)/*.o $(DEBUG)/*.su $(DEBUG)/*.elf $(DEBUG)/*.map $(DEBUG)/*.list $(DEBUG)/*.bin
+	rm -f $(RELEASE)/*.o $(RELEASE)/*.su $(RELEASE)/*.elf $(RELEASE)/*.map $(RELEASE)/*.list $(RELEASE)/*.bin
 
 
 
 
-DEBUG/%.o:   Libraries/STM32F10x_StdPeriph_Driver/src/%.c | DEBUG
-	$(GCC) -g -c $< -O0 $(CFLAGS) $(IFLAGS) $(DFLAGS) $(MFLAGS) $(FFLAGS) -o $@
+$(DEBUG)/%.o:   Libraries/STM32F10x_StdPeriph_Driver/src/%.c | $(DEBUG)
+	$(GCC) -g -c $< -O0 -DDEBUGBUILD $(CFLAGS) $(IFLAGS) $(DFLAGS) $(MFLAGS) $(FFLAGS) -o $@
 	@echo
 
-DEBUG/%.o:   src/%.c | DEBUG
-	$(GCC) -g -c $< -O0 $(CFLAGS) $(IFLAGS) $(DFLAGS) $(MFLAGS) $(FFLAGS) -o $@
+$(DEBUG)/%.o:   src/%.c | $(DEBUG)
+	$(GCC) -g -c $< -O0 -DDEBUGBUILD $(CFLAGS) $(IFLAGS) $(DFLAGS) $(MFLAGS) $(FFLAGS) -o $@
 	@echo
 
-DEBUG/%.o:   src/%.s | DEBUG
-	$(GCC) -g -c $(MFLAGS) $(DFLAGS) $(IFLAGS) $(ASFLAGS) -o $@ $<
+$(DEBUG)/%.o:   src/%.s | $(DEBUG)
+	$(GCC) -g -c -DDEBUGBUILD $(MFLAGS) $(DFLAGS) $(IFLAGS) $(ASFLAGS) -o $@ $<
 	@echo
 
 
-RELEASE/%.o:   Libraries/STM32F10x_StdPeriph_Driver/src/%.c | RELEASE
+$(RELEASE)/%.o:   Libraries/STM32F10x_StdPeriph_Driver/src/%.c | $(RELEASE)
 	$(GCC) -c $< -Os $(CFLAGS) $(IFLAGS) $(DFLAGS) $(MFLAGS) $(FFLAGS) -o $@
 	@echo
 
-RELEASE/%.o:   src/%.c | RELEASE
-	$(GCC) -c $< -Os $(OPTIM) $(CFLAGS) $(IFLAGS) $(DFLAGS) $(MFLAGS) $(FFLAGS) -o $@
+$(RELEASE)/%.o:   src/%.c | $(RELEASE)
+	$(GCC) -c $< -Os $(CFLAGS) $(IFLAGS) $(DFLAGS) $(MFLAGS) $(FFLAGS) -o $@
 	@echo
 
-RELEASE/%.o:   src/%.s | RELEASE
+$(RELEASE)/%.o:   src/%.s | $(RELEASE)
 	$(GCC) -c $(MFLAGS) $(DFLAGS) $(IFLAGS) $(ASFLAGS) -o $@ $<
 	@echo
 
-DEBUG:
-	mkdir DEBUG
+$(DEBUG):
+	mkdir $(DEBUG)
 
-RELEASE:
-	mkdir RELEASE
+$(RELEASE):
+	mkdir $(RELEASE)

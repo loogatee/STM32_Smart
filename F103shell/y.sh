@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/bin/bash
 
 #arm-atollic-eabi-objcopy -O binary waveshare.elf waveshare.bin
 #
