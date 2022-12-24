@@ -90,15 +90,15 @@ clean:
 
 
 $(DEBUG)/%.o:   Libraries/STM32F10x_StdPeriph_Driver/src/%.c | $(DEBUG)
-	$(GCC) -c $< -O0 -g $(CFLAGS) $(IFLAGS) $(DFLAGS) $(MFLAGS) $(FFLAGS) -o $@
+	$(GCC) -c $< -O0 -g -DDEBUGBUILD $(CFLAGS) $(IFLAGS) $(DFLAGS) $(MFLAGS) $(FFLAGS) -o $@
 	@echo
 
 $(DEBUG)/%.o:   src/%.c | $(DEBUG)
-	$(GCC) -c $< -O0 -g $(CFLAGS) $(IFLAGS) $(DFLAGS) $(MFLAGS) $(FFLAGS) -o $@
+	$(GCC) -c $< -O0 -g -DDEBUGBUILD $(CFLAGS) $(IFLAGS) $(DFLAGS) $(MFLAGS) $(FFLAGS) -o $@
 	@echo
 
 $(DEBUG)/%.o:   src/%.s | $(DEBUG)
-	$(GCC) -c -g $(MFLAGS) $(DFLAGS) $(IFLAGS) $(ASFLAGS) -o $@ $<
+	$(GCC) -c -g -DDEBUGBUILD $(MFLAGS) $(DFLAGS) $(IFLAGS) $(ASFLAGS) -o $@ $<
 	@echo
 
 
