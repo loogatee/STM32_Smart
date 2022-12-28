@@ -22,11 +22,7 @@ uint32_t  dbg_counter;
 int main(void)
 {
 
-    uint32_t           Ntime;
-    uint8_t            l1,Kl1,l2,Kl2;
-
-    Ntime = 0;
-    Kl1 = Kl2 = 0xff;
+    uint32_t  Ntime = 0;
 
     dbg_counter = 0;
 
@@ -38,7 +34,6 @@ int main(void)
     SystemCoreClockUpdate();                                // Update SystemCoreClock variable according to Clock Register Values.
     RCC_GetClocksFreq(&rclocks);                            // fills in HCLK_Frequency
     SysTick_Config(rclocks.HCLK_Frequency / 1000 );         // This provides for a 1ms ticker.  Verified with scope!
-
 
     RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOC, ENABLE);   // To enable output LED on C13
     RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);   // To enable output Pin on B5, used for scope probe
@@ -60,33 +55,9 @@ int main(void)
 
         if (Ticker_GetDelta(Ntime) >= 500 )                 // When ticker delta hits 500ms
         {
-            Ntime = Ticker_Get();                           // new base for the delta compare
-            CMDS_GetBlinks(&l1, &l2);                       // set using the 'bl' command
-
-            if ((l1 != Kl1) || (l1 == '2'))
-            {
-                Kl1 = l1;
-                switch(l1)
-                {
-                  case '0':    GPIOC->ODR |=  GPIO_Pin_13;   break;    // off
-                  case '1':    GPIOC->ODR &= ~GPIO_Pin_13;   break;    // on
-                  case '2':    GPIOC->ODR ^=  GPIO_Pin_13;   break;    // blink
-                }
-            }
-
-            if ((l2 != Kl2) || (l2 == '2'))
-            {
-                Kl2 = l2;
-                switch(l2)
-                {
-                  case '0':    GPIOB->ODR &= ~GPIO_Pin_5;   break;    // off
-                  case '1':    GPIOB->ODR |=  GPIO_Pin_5;   break;    // on
-                  case '2':    GPIOB->ODR ^=  GPIO_Pin_5;   break;    // blink
-                }
-            }
-
-            //Uart_Print32("dbg_counter: ", dbg_counter);
+            Ntime       = Ticker_Get();                     // new base for the delta compare
             dbg_counter = 0;
+            CMDS_LedBlinks();
         }
     }
 }

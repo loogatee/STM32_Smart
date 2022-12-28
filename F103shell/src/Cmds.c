@@ -34,7 +34,7 @@ typedef struct
 #endif
 #define VERSION_MAJOR   1
 #define VERSION_MINOR   2
-#define VERSION_DATE    "12/24/2022 13:44\r\n"
+#define VERSION_DATE    "12/28/2022 13:44\r\n"
 
 
 #define  SAFE_MEM_ADDR           &cmds_freebuf[0]
@@ -78,13 +78,15 @@ static uint32_t    cmds_count1;
 static uint32_t    cmds_Wtime;
 static uint8_t     cmds_blink1;
 static uint8_t     cmds_blink2;
+static uint8_t     cmds_Kbl1;
+static uint8_t     cmds_Kbl2;
 static uint8_t     cmds_TA[8];
 
 static RTC_DateTimeTypeDef  cmds_DTrtc;
 static Commands_t           cmds_state_machine;
 static SubCommands_t        cmds_substate;
 
-
+static uint32_t dbgcount1;
 
 
 
@@ -105,9 +107,10 @@ void CMDS_Init(void)
 {
     cmds_input_ready   = FALSE;
     cmds_state_machine = CMDSM_WAITFORLINE;
-    cmds_blink1        = '2';
-    cmds_blink2        = '0';
     cmds_MDaddr        = (uint32_t)0x20000000;     // start of ram STM32F103xx
+
+    cmds_blink1 = cmds_Kbl1  = '2';
+    cmds_blink2 = cmds_Kbl2  = '0';
 
     *((uint32_t *)SAFE_MEM_ADDR) = 0xBC00BC99;
 }
@@ -192,6 +195,40 @@ static bool cmds_BL ( void )
 }
 
 
+/**
+ * Called from main when the 500ms ticker expires
+ *
+ */
+void CMDS_LedBlinks(void)
+{
+    if ((cmds_blink1 != cmds_Kbl1) || (cmds_blink1 == '2'))
+    {
+        cmds_Kbl1 = cmds_blink1;
+        switch(cmds_blink1)
+        {
+          case '0':    GPIOC->ODR |=  GPIO_Pin_13;   break;    // off
+          case '1':    GPIOC->ODR &= ~GPIO_Pin_13;   break;    // on
+          case '2':    GPIOC->ODR ^=  GPIO_Pin_13;   break;    // blink
+        }
+    }
+
+    if ((cmds_blink2 != cmds_Kbl2) || (cmds_blink2 == '2'))
+    {
+        cmds_Kbl2 = cmds_blink2;
+        switch(cmds_blink2)
+        {
+          case '0':    GPIOB->ODR &= ~GPIO_Pin_5;   break;    // off
+          case '1':    GPIOB->ODR |=  GPIO_Pin_5;   break;    // on
+          case '2':    GPIOB->ODR ^=  GPIO_Pin_5;   break;    // blink
+        }
+    }
+}
+
+
+
+
+
+
 static bool cmds_LB ( void )
 {
     return TRUE;
@@ -201,15 +238,11 @@ static bool cmds_LB ( void )
 //
 static bool cmds_CL ( void )
 {
-    //uint16_t  password;
-    //uint32_t  tmpstore;
     size_t  slen = strlen(cmds_InpPtr);
-    //char    c3   = cmds_InpPtr[3];
-    //char    c4   = cmds_InpPtr[4];
 
     if(slen == 2)
     {
-        Uart_PrintSTR( "cl lb");
+        Uart_PrintSTR( "placeholder");
     }
     return TRUE;
 }
@@ -221,21 +254,8 @@ static bool cmds_CL ( void )
 static bool cmds_R( void )
 {
     uint32_t  tmpw;
-    //Ifx_ASCLIN   *THE_USART = USART0;
-    
-    if( cmds_InpPtr[1] == 'a' && cmds_InpPtr[2] == '0')
-    {
-        Uart_PrintSTR("Asclin1 Registers:\n\r");
-    }
-    else if( cmds_InpPtr[1] == 'l' )
-    {
-        Uart_PrintSTR("LBISTCTRL Registers:\n\r");
-    }
-    else if( cmds_InpPtr[1] == 'm' && cmds_InpPtr[2] == 'i' && cmds_InpPtr[3] == 'r')
-    {
-        Uart_PrintSTR("nada:\n\r");
-    }
-    else if( cmds_InpPtr[1] == 'm' )
+
+    if( cmds_InpPtr[1] == 'm' )
     {
         tmpw = HtoI(&cmds_InpPtr[3]) & 0xFFFFFFFC;                              // bits 0 and 1 forced to 0
         Uart_Print32N( "0x", tmpw );
@@ -243,7 +263,7 @@ static bool cmds_R( void )
     }
     else if( cmds_InpPtr[1] == 'p' )
     {
-        Uart_PrintSTR("PMS_EVRSD Registers:\n\r");
+        ;
     }
     else if( cmds_InpPtr[1] == 'c' )
     {
@@ -290,7 +310,8 @@ static bool cmds_T( void )
     }
     else if( cmds_InpPtr[1] == '4' )
     {
-        Uart_Print32( "ticker: ", Ticker_Get() );
+        Uart_Print32( "ticker:    ", Ticker_Get() );
+        Uart_Print32( "dbgcount1: ", dbgcount1);
     }
     
     return TRUE;
@@ -420,7 +441,6 @@ static bool cmds_ST(void)
         cmds_DTrtc.RTC_Wday    = cmds_TA[2];
         cmds_DTrtc.RTC_Year    = cmds_TA[5] + 2000;
 
-        RCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR,  ENABLE);
         PWR_BackupAccessCmd(ENABLE);
         RCC_BackupResetCmd(ENABLE);
         RCC_BackupResetCmd(DISABLE);
@@ -428,11 +448,16 @@ static bool cmds_ST(void)
   
         cmds_state_machine = CMDSM_ST;
         cmds_substate      = DO_PROCESSa;
+        dbgcount1          = 0;
         break;
 
     case DO_PROCESSa:
 
-        if ((RCC->BDCR & RCC_BDCR_LSERDY) != RCC_BDCR_LSERDY) { goto OUT; }
+        if ((RCC->BDCR & RCC_BDCR_LSERDY) != RCC_BDCR_LSERDY)
+        {
+        	dbgcount1++;
+        	goto OUT;
+        }
 
         RCC_RTCCLKConfig(RCC_RTCCLKSource_LSE);
         RTC_SetPrescaler(0x7FFF);
@@ -497,273 +522,6 @@ static bool cmds_RTC( void )
 
     return TRUE;
 }
-
-#ifdef NOTRIGHTNOW
-
-static boolean cmds_B( void )
-{
-    if(strlen(cmds_InpPtr) == 1)
-    {
-        //U2_Print32( "count1: 0x", count1 );
-        //U2_Print32( "count2: 0x", count2 );
-        //U2_Print32( "count3: 0x", count3 );
-        //U2_Print32( "count4: 0x", count4 );
-    }
-
-    if( cmds_InpPtr[1] == '1' )
-    {
-        U2_Print32("SR1: ",I2C1->SR1);
-        U2_Print32("SR2: ",I2C1->SR2);
-        U2_Print32("CR1: ",I2C1->CR1);
-        U2_Print32("CR2: ",I2C1->CR2);
-        U2_Print32("AFRL: ",GPIOB->AFR[0]);
-    }
-    else if( cmds_InpPtr[1] == '2' )
-    {
-         ;
-    }
-    else if( cmds_InpPtr[1] == '3' )
-    {
-        ;
-    }
-    else if( cmds_InpPtr[1] == '4' )
-    {
-        ;
-    }
-    return TRUE;
-}
-
-
-
-
-
-//
-//   DS1307 device on the i2c bus
-//
-static boolean cmds_A( uint32 state )
-{
-    if( state == DO_INIT )
-    {
-        xRTC_GetTime();
-        cmds_state_machine = CMDSM_RTC_RDONE;
-    }
-    else if( xRTC_ShowTime() != RTC_COMPLETION_BUSY )
-    {
-        cmds_state_machine = CMDSM_WAITFORLINE;
-        return TRUE;
-    }
-    return FALSE;
-}
-
-
-//xRTC_GetTemperatureOnly(void);
-//uint8    xRTC_ShowTemperatureOnly( void );
-static boolean cmds_Y( uint32 state )
-{
-    int a = strlen(cmds_InpPtr);
-
-    if( (a == 1) || (a == 2 && cmds_InpPtr[1] == '1') )
-    {
-        if( state == DO_INIT )
-        {
-            xRTC_GetYearOnly();
-            cmds_state_machine = CMDSM_RTCY_RDONE;
-        }
-        else if( xRTC_ShowYearOnly() != RTC_COMPLETION_BUSY )
-        {
-            cmds_state_machine = CMDSM_WAITFORLINE;
-            return TRUE;
-        }
-    }
-    else if( a == 2 && cmds_InpPtr[1] == '2')
-    {
-        if( state == DO_INIT )
-        {
-            xRTC_GetTemperatureOnly();
-            cmds_state_machine = CMDSM_RTCY_RDONE;
-        }
-        else if( xRTC_ShowTemperatureOnly() != RTC_COMPLETION_BUSY )
-        {
-            cmds_state_machine = CMDSM_WAITFORLINE;
-            return TRUE;
-        }
-    }
-    return FALSE;
-}
-
-
-//
-//   DS1307 device on the i2c bus
-//
-static bool cmds_Z( uint32 state )
-{
-    if( state == DO_INIT )
-    {
-        xRTC_SetTime_Canned();
-        cmds_state_machine = CMDSM_RTC_WDONE;
-    }
-    else if( xRTC_SetComplete() != RTC_COMPLETION_BUSY )
-    {
-        cmds_state_machine = CMDSM_WAITFORLINE;
-        return TRUE;
-    }
-    return FALSE;
-}
-
-
-
-
-
-
-// show clock
-//
-//    debug:  shows some clock registers
-//
-static bool cmds_SC( void )
-{
-    uint32_t tmp;
-    RCC_ClocksTypeDef  rclocks;
-
-    tmp = RCC->CFGR & RCC_CFGR_SWS;
-    if( tmp == 0 )
-        U2_PrintSTR("HSI\n\r");
-    else if( tmp == 4 )
-        U2_PrintSTR("HSE\n\r");
-    else
-        U2_PrintSTR("PLL\n\r");
-
-    SystemCoreClockUpdate();
-    RCC_GetClocksFreq(&rclocks);
-
-    U2_Print32( "SYSCLK: ", rclocks.SYSCLK_Frequency );
-    U2_Print32( "HCLK:   ", rclocks.HCLK_Frequency   );
-    U2_Print32( "PCLK1:  ", rclocks.PCLK1_Frequency  );
-    U2_Print32( "PCLK2:  ", rclocks.PCLK2_Frequency  );
-
-    U2_Print32( "RCC->APB1ENR:  ", RCC->APB1ENR  );
-
-    return TRUE;
-}
-
-
-
-
-//  24LC256:  I2C flash memory
-//
-// fr XXXX    where msb <= 0x7F
-// Reads 8 bytes at XXXX\r\n" );
-//
-
-static bool cmds_FR( uint32 state )
-{
-    uint8 xx;
-
-    if ( state == DO_INIT )
-    {
-        if( strlen(cmds_InpPtr) >= 4 ) { cmds_addr.w = HtoU16(&cmds_InpPtr[3]); }
-        xFlash_GetMem16(cmds_addr);
-        cmds_state_machine = CMDSM_FLASH_RDONE;
-        cmds_byte1 = 0;
-    }
-    else if( (xx=xFlash_ShowMem16()) != FLASH_COMPLETION_BUSY )
-    {
-        if( xx == FLASH_COMPLETION_TIMEOUT )
-        {
-            cmds_state_machine = CMDSM_WAITFORLINE;
-            return TRUE;
-        }
-        else
-        {
-            cmds_addr.w += 16;
-            if( ++cmds_byte1 == 4 )
-            {
-                ItoH( cmds_addr.w, &cmds_InpPtr[3] );
-                cmds_state_machine = CMDSM_WAITFORLINE;
-                return TRUE;
-            }
-            else
-            {
-                xFlash_GetMem16(cmds_addr);
-            }
-        }
-    }
-
-    return FALSE;
-}
-
-
-//  24LC256:  I2C flash memory
-//
-//  0123456789012345678901234
-//  fw 0400 1203310117223344
-//
-static bool cmds_FW( uint32 state )
-{
-    char wbuf[3];
-    uint8   i,k;
-
-    wbuf[2] = 0;
-
-    if ( state == DO_INIT )
-    {
-        cmds_addr.w = HtoU16( &cmds_InpPtr[3] );
-
-        for( i=8,k=0; k < 8; i+=2,k++ )
-        {
-            wbuf[0]    = cmds_InpPtr[i];
-            wbuf[1]    = cmds_InpPtr[i+1];
-            cmds_TA[k] = (uint8)HtoU16( wbuf );
-        }
-
-        xFlash_Write8( cmds_addr, cmds_TA );
-        cmds_state_machine = CMDSM_FLASH_WDONE;
-    }
-    else if( xFlash_WriteComplete() != FLASH_COMPLETION_BUSY )
-    {
-        cmds_state_machine = CMDSM_WAITFORLINE;
-        return TRUE;
-    }
-
-    return FALSE;
-}
-
-
-
-
-
-
-
-static bool cmds_TS( uint32 state )
-{
-    uint8  i,k;
-
-    if( strlen(cmds_InpPtr) == 2 )
-    {
-        U2_PrintSTR( "(i2c) TS mins hrs wkday day mon yr     (Sun=01)\r\n" );
-        return TRUE;
-    }
-
-    if( state == DO_INIT )
-    {
-        for( i=3,k=0; i < 20; i += 3 )
-        {
-            cmds_InpPtr[i+2] = 0;
-            cmds_TA[k++]     = (uint8)HtoU16( &cmds_InpPtr[i] );
-        }
-
-        xRTC_SetTime( cmds_TA );
-        cmds_state_machine = CMDSM_RTC_TSDONE;
-    }
-    else if( xRTC_SetComplete() != RTC_COMPLETION_BUSY )
-    {
-        cmds_state_machine = CMDSM_WAITFORLINE;
-        return TRUE;
-    }
-
-    return FALSE;
-}
-
-#endif
 
 
 //===================================================================================================
