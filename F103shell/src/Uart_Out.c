@@ -6,8 +6,8 @@
 #include "Utils.h"
 
 
-
-
+#define ENQUEUE_SER_ITEM()   ++serd_num_Qitems; if( ++serd_inn_Qindex == SERO_SQENTRYS ) { serd_inn_Qindex = 0; }
+#define DEQUEUE_SER_ITEM()   --serd_num_Qitems; if( ++serd_out_Qindex == SERO_SQENTRYS ) { serd_out_Qindex = 0; }
 
 
 #define SERO_STATE_GETJOB      0
@@ -28,16 +28,15 @@ typedef struct
 
 
 
-                                                    // OUTPUT related global variables:
-static uint32_t    serd_num_Qitems;                 //   Number of Items on the Queue
-static uint32_t    serd_inn_Qindex;                 //   Item will be deposited here
-static uint32_t    serd_out_Qindex;                 //   Item will be removed from here
-static SERI_t     *serd_active_Qitem;               //   pointer to currently active item
-static SERI_t      serd_Q_items[SERO_SQENTRYS];     //   Serial Job Data Items
-static uint32_t    serd_ostate_machine;             //   holds state of Serial Output machine
-static char        serd_databuf[16];                //   data buffer for value conversion
-static uint8_t   serd_pfbuf[LEN_PRINTF_BUF];
-static uint32_t  serd_pfindex;
+static uint8_t    serd_num_Qitems;                 //   Number of Items on the Queue
+static uint8_t    serd_inn_Qindex;                 //   Item will be deposited here
+static uint8_t    serd_out_Qindex;                 //   Item will be removed from here
+static SERI_t    *serd_active_Qitem;               //   pointer to currently active item
+static SERI_t     serd_Q_items[SERO_SQENTRYS];     //   Serial Job Data Items
+static uint8_t    serd_ostate_machine;             //   holds state of Serial Output machine
+static char       serd_databuf[16];                //   data buffer for value conversion
+static uint8_t    serd_pfbuf[LEN_PRINTF_BUF];      //   buffer for printf strings
+static uint32_t   serd_pfindex;                    //   insertion point in printf buffer
 
 
 
@@ -50,7 +49,7 @@ void UartOut_Init( void )
     serd_inn_Qindex     = 0;
     serd_out_Qindex     = 0;
     serd_ostate_machine = SERO_STATE_GETJOB;
-//  serd_pfindex        = 0;
+    serd_pfindex        = 0;
 }
 
 
@@ -59,7 +58,7 @@ void UartOut_Init( void )
 //  This is the 'Front End' or Producer of Serial Data.   The idea is to stash the
 //  parameters quickly in a Queue, then let the 'Back End' (the Consumer) process the
 //  data off the Queue, and perform the printing.
-//  The data is destined for USART2.
+//  The data is destined for USART1 on the STM32_Smart board (A9=TX,A10=RX)
 //     **Note the use of void for return. Alternative is return -1 when Q is full.
 //       Consider using completionptr to let the Q drain, then keep printing.
 //
@@ -82,8 +81,7 @@ void Uart_Send( uint32_t otype, char *sptr, uint32_t *completionptr, uint32_t av
     if( serd_num_Qitems != SERO_SQENTRYS )                                      // Proceed if the Queue is not full
     {
         lqitem = &serd_Q_items[serd_inn_Qindex];                                // item will go in at index serd_inn_qindex
-        ++serd_num_Qitems;                                                      // Queue size is increased by 1
-        if( ++serd_inn_Qindex == SERO_SQENTRYS ) { serd_inn_Qindex = 0; }       // where the next item will go:  wrap if necessary
+        ENQUEUE_SER_ITEM();
 
         lqitem->sr_dval    = aval;                                              // aval goes into element on the Q
         lqitem->sr_otype   = otype;                                             // otype goes into element on the Q
@@ -161,8 +159,7 @@ void UartOut_Process( void )
             else                                                                    // ELSE this print job is done
             {
                 serd_ostate_machine = SERO_STATE_GETJOB;                            // switch state:  look for another job
-                --serd_num_Qitems;                                                  // Can now decrement Queue size by 1
-                if( ++serd_out_Qindex == SERO_SQENTRYS ) { serd_out_Qindex = 0; }   // index to next element in the Circular Q.  Wrap if necessary
+                DEQUEUE_SER_ITEM();
 
                 if( serd_active_Qitem->sr_compPtr != 0 )                            // Is there a valid Completion Pointer ?
                     *serd_active_Qitem->sr_compPtr = 1;                             //    signal a 1 to that address to indicate completion

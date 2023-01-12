@@ -34,7 +34,7 @@ typedef struct
 #endif
 #define VERSION_MAJOR   1
 #define VERSION_MINOR   2
-#define VERSION_DATE    "12/28/2022 13:44\r\n"
+#define VERSION_DATE    "01/11/2023 17:43\r\n"
 
 
 #define  SAFE_MEM_ADDR           &cmds_freebuf[0]

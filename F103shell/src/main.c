@@ -35,6 +35,7 @@ int main(void)
     RCC_GetClocksFreq(&rclocks);                            // fills in HCLK_Frequency
     SysTick_Config(rclocks.HCLK_Frequency / 1000 );         // This provides for a 1ms ticker.  Verified with scope!
 
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR,  ENABLE);    // necessary to set the RTC.
     RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOC, ENABLE);   // To enable output LED on C13
     RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);   // To enable output Pin on B5, used for scope probe
     RCC_APB2PeriphClockCmd(RCC_APB2Periph_USART1 | RCC_APB2Periph_GPIOA, ENABLE);  // to enable USART pins A9 (Tx) and A10 (Rx)

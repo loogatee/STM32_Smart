@@ -18,9 +18,9 @@
 
 
                                                     // INPUT related global variables:
-static uint32_t    seri_state_machine;              //   state of Serial machine, Input
+static uint8_t     seri_state_machine;              //   state of Serial machine, Input
 static bool        seri_CmdDone;                    //   signal for CMD completion
-static uint32_t    seri_cnt;                        //   input: count of chars in buffer
+static uint8_t     seri_cnt;                        //   input: count of chars in buffer
 static uint8_t     seri_ch;                         //   input: character just received
 static char        seri_dat[SERI_MAX_CHARS];        //   input: data buffer
 
